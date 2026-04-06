@@ -336,6 +336,8 @@ static void opmodeLora() {
     writeReg(RegOpMode, u);
 }
 
+static u1_t packetsent_seen = 0;
+
 static void opmodeFSK() {
     u1_t u = 0;
 #ifdef CFG_sx1276_radio
@@ -487,6 +489,7 @@ static void power_tcxo (void) {
 #define RF_FIFOTHRESH_TXSTARTCONDITION_FIFONOTEMPTY 0x80
 
 static void txfsk () {
+    packetsent_seen = 0; // clear for new TX cycle
     // select FSK modem (from sleep mode)
     writeReg(RegOpMode, 0x0 /* 0x10 */ ); // FSK, BT=0.5
     ASSERT(readReg(RegOpMode) == 0x0 /* 0x10 */ );
@@ -1053,7 +1056,8 @@ u1_t radio_has_irq (void) {
             return 1;
     } else { // FSK modem
         flags = readReg(FSKRegIrqFlags2);
-        if ( flags & ( IRQ_FSK2_PACKETSENT_MASK | IRQ_FSK2_PAYLOADREADY_MASK) ) 
+        if ( (!packetsent_seen && (flags & IRQ_FSK2_PACKETSENT_MASK)) ||
+             (flags & IRQ_FSK2_PAYLOADREADY_MASK) ) 
             return 1;
         flags = readReg(FSKRegIrqFlags1);
         if ( flags & ( IRQ_FSK1_TIMEOUT_MASK | IRQ_FSK1_SYNCADDRESSMATCH_MASK ) )
@@ -1141,7 +1145,7 @@ void radio_irq_handler (u1_t dio) {
         u1_t flags1 = readReg(FSKRegIrqFlags1);
         u1_t flags2 = readReg(FSKRegIrqFlags2);
         if( flags2 & IRQ_FSK2_PACKETSENT_MASK ) {
-            // save exact tx time
+            packetsent_seen = 1; // prevent re-triggering in polling mode
             LMIC.txend = now;
         } else if( flags2 & IRQ_FSK2_PAYLOADREADY_MASK ) {
             // save exact rx time

@@ -831,7 +831,7 @@ static void sx12xx_transmit()
     sx12xx_setvars();
     os_setCallback(&sx12xx_txjob, sx12xx_tx_func);
 
-    unsigned long tx_timeout = LMIC.protocol ? (LMIC.protocol->air_time + 25) : 60;
+    unsigned long tx_timeout = LMIC.protocol ? (LMIC.protocol->air_time + 200) : 200;
     unsigned long tx_start   = millis();
 
     while (sx12xx_transmit_complete == false) {
@@ -2228,7 +2228,11 @@ byte RF_setup(void)
   if (settings->altprotocol == settings->rf_protocol
         //|| ! in_family(settings->rf_protocol)
         //|| ! in_family(settings->altprotocol)
-        || (rf_chip != &sx1276_ops && rf_chip != &sx1262_ops)) {
+        || (rf_chip != &sx1276_ops
+#if defined(USE_BASICMAC)
+            && rf_chip != &sx1262_ops
+#endif
+        )) {
       settings->altprotocol = RF_PROTOCOL_NONE;
   }
 
