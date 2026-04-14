@@ -800,17 +800,9 @@ static bool sx12xx_receive()
   sx12xx_receive_complete = false;
 
   if (LMIC.protocol != curr_rx_protocol_ptr) {
-    if (rf_chip == &sx1262_ops
-     && curr_rx_protocol_ptr == &flr_adsl_proto_desc
-     && curr_tx_protocol_ptr != curr_rx_protocol_ptr
-     && TxEndMarker != 0
-     && !RF_Transmit_Happened()
-     && millis() < TxEndMarker) {
-      return false;
-    }
     RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
     LMIC.protocol = curr_rx_protocol_ptr;
-    RF_chip_reset(current_RX_protocol);
+    RF_chip_channel(current_RX_protocol);
   }
 
   if (!sx12xx_receive_active) {  // reset by sx12xx_rx_func() or by sx12xx_channel()
@@ -2512,7 +2504,7 @@ void RF_SetChannel(void)
 
 void set_protocol_for_slot()
 {
-  //uint8_t prev_protocol = current_RX_protocol;
+  const rf_proto_desc_t *prev_rx_protocol_ptr = curr_rx_protocol_ptr;
 
   // Transmit one packet in alt protocol once every 4 seconds:
   // In time Slot 0 for ADS-L & FLR, and in Slot 1 for OGNTP.
@@ -2663,13 +2655,10 @@ void set_protocol_for_slot()
   //if (current_RX_protocol != prev_protocol)
   //    RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
 
-  if (LMIC.protocol != curr_tx_protocol_ptr) {
-      RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
-      LMIC.protocol = curr_tx_protocol_ptr;
-      RF_chip_reset(current_TX_protocol);
-  } else {
-      RF_chip_channel(current_TX_protocol);
+  if (prev_rx_protocol_ptr != curr_rx_protocol_ptr) {
+      RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
   }
+  RF_chip_channel(current_RX_protocol);
 
 /*
   if (dual_protocol == RF_SINGLE_PROTOCOL && current_TX_protocol != settings->rf_protocol) {
@@ -2930,9 +2919,7 @@ bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-r
             // (usually LMIC.protocol was set in set_protocol_for_slot())
             RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
             LMIC.protocol = curr_tx_protocol_ptr;
-            RF_chip_reset(current_TX_protocol);
-            if (rf_chip == &sx1262_ops && curr_tx_protocol_ptr != curr_rx_protocol_ptr)
-                delay(10);
+            RF_chip_channel(current_TX_protocol);
         }
 
         bool success = true;
@@ -2979,8 +2966,6 @@ Serial.printf("TX in protocol %d(%s) at %d ms, size=%d\r\n",
                 //delay(20);    // <<< can this delay be safely shortened?
                 delay(10);      // maybe even less, if "sx12xx_transmit_complete" means what it says?
                 RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
-                LMIC.protocol = curr_rx_protocol_ptr;
-                RF_chip_reset(current_RX_protocol);     // <<< may want to condition this?
                 //Serial.println("returned to normal protocol...");
             }
         }
