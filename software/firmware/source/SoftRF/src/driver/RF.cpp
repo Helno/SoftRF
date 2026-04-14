@@ -523,8 +523,8 @@ static bool sx1276_probe()
 
   v_reset = sx1276_readReg(SX1276_RegVersion);
 
-  hal_pin_rst(2); // configure RST pin floating!
-  hal_waitUntil(os_getTime()+ms2osticks(5)); // wait 5ms
+  hal_pin_rst(1); // drive RST pin high for Waveshare SX1262
+  hal_waitUntil(os_getTime()+ms2osticks(50)); // wait 50ms
 
   v = sx1276_readReg(SX1276_RegVersion);
 
@@ -545,7 +545,10 @@ static bool sx1276_probe()
 
 #if defined(USE_BASICMAC)
 
+#define CMD_SETSTANDBY              0x80
 #define CMD_READREGISTER		        0x1D
+#define CMD_GETSTATUS               0xC0
+#define STDBY_RC                    0x00
 #define REG_LORASYNCWORDLSB	        0x0741
 #define SX126X_DEF_LORASYNCWORDLSB  0x24
 
@@ -568,39 +571,50 @@ static uint8_t sx1262_ReadReg (uint16_t addr) {
     return val;
 }
 
+static void sx1262_SetStandby(uint8_t mode) {
+    hal_spi_select(1);
+    hal_pin_busy_wait();
+    hal_spi(CMD_SETSTANDBY);
+    hal_spi(mode);
+    hal_spi_select(0);
+}
+
+static uint8_t sx1262_GetStatus() {
+    hal_spi_select(1);
+    hal_pin_busy_wait();
+    hal_spi(CMD_GETSTATUS);
+    uint8_t stat = hal_spi(0x00);
+    hal_spi_select(0);
+    return stat;
+}
+
 static bool sx1262_probe()
 {
-  u1_t v, v_reset;
+  u1_t status_reset, status_stby;
 
   SoC->SPI_begin();
 
   hal_init_softrf (nullptr);
 
-  // manually reset radio
   hal_pin_rst(0); // drive RST pin low
-  hal_waitUntil(os_getTime()+ms2osticks(1)); // wait >100us
+  hal_waitUntil(os_getTime()+ms2osticks(1));
 
-  v_reset = sx1262_ReadReg(REG_LORASYNCWORDLSB);
+  status_reset = sx1262_GetStatus();
 
-  hal_pin_rst(2); // configure RST pin floating!
-  hal_waitUntil(os_getTime()+ms2osticks(5)); // wait 5ms
+  hal_pin_rst(1); // drive RST pin high
+  hal_waitUntil(os_getTime()+ms2osticks(5));
 
-  v = sx1262_ReadReg(REG_LORASYNCWORDLSB);
+  sx1262_SetStandby(STDBY_RC);
+  hal_waitUntil(os_getTime()+ms2osticks(1));
+  status_stby = sx1262_GetStatus();
+
+  Serial.printf("sx1262_probe: status_reset=0x%02X status_stby=0x%02X nss=%u rst=%u busy=%u\n",
+                status_reset, status_stby, lmic_pins.nss, lmic_pins.rst, lmic_pins.busy);
 
   pinMode(lmic_pins.nss, INPUT);
   SPI.end();
 
-  u1_t fanet_sw_lsb = ((fanet_proto_desc.syncword[0]  & 0x0F) << 4) | 0x04;
-  if (v == SX126X_DEF_LORASYNCWORDLSB || v == fanet_sw_lsb) {
-
-    if (v_reset == SX126X_DEF_LORASYNCWORDLSB || v == fanet_sw_lsb) {
-      RF_SX12XX_RST_is_connected = false;
-    }
-
-    return true;
-  } else {
-    return false;
-  }
+  return (status_stby & 0x70) == 0x20;
 }
 #endif
 
@@ -831,7 +845,7 @@ static void sx12xx_transmit()
     sx12xx_setvars();
     os_setCallback(&sx12xx_txjob, sx12xx_tx_func);
 
-    unsigned long tx_timeout = LMIC.protocol ? (LMIC.protocol->air_time + 25) : 60;
+    unsigned long tx_timeout = LMIC.protocol ? (LMIC.protocol->air_time + 200) : 200;
     unsigned long tx_start   = millis();
 
     while (sx12xx_transmit_complete == false) {
@@ -2228,7 +2242,11 @@ byte RF_setup(void)
   if (settings->altprotocol == settings->rf_protocol
         //|| ! in_family(settings->rf_protocol)
         //|| ! in_family(settings->altprotocol)
-        || (rf_chip != &sx1276_ops && rf_chip != &sx1262_ops)) {
+        || (rf_chip != &sx1276_ops
+#if defined(USE_BASICMAC)
+            && rf_chip != &sx1262_ops
+#endif
+        )) {
       settings->altprotocol = RF_PROTOCOL_NONE;
   }
 

@@ -54,7 +54,6 @@ static void hal_io_init () {
     //ASSERT(lmic_pins.dio[1] != LMIC_UNUSED_PIN || lmic_pins.dio[2] != LMIC_UNUSED_PIN);
 #elif defined(BRD_sx1261_radio) || defined(BRD_sx1262_radio)
     ASSERT(lmic_pins.dio[0] == LMIC_UNUSED_PIN);
-    ASSERT(lmic_pins.dio[1] == LMIC_UNUSED_PIN);
     ASSERT(lmic_pins.dio[2] == LMIC_UNUSED_PIN);
 #else
     #error "Unknown radio type?"
@@ -158,13 +157,13 @@ static void hal_io_check() {
                 // Now clear the eds flag by setting it to 1
                 bcm2835_gpio_set_eds(lmic_pins.dio[i]);
                 // Handle pseudo interrupt
-                radio_irq_handler(i, hal_ticks());
+                radio_irq_handler((1 << i), hal_ticks());
             }
 #else
             if (dio_states[i] != digitalRead(lmic_pins.dio[i])) {
                 dio_states[i] = !dio_states[i];
                 if (dio_states[i]) {
-                    radio_irq_handler(i, hal_ticks());
+                    radio_irq_handler((1 << i), hal_ticks());
                 }
             }
 #endif
@@ -212,7 +211,7 @@ static void hal_io_check() {
 
         if (interrupt_flags[i]) {
             interrupt_flags[i] = false;
-            radio_irq_handler(i, hal_ticks());
+            radio_irq_handler((1 << i), hal_ticks());
         }
     }
 }

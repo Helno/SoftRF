@@ -103,12 +103,14 @@ PRORAD_CPPS   := $(PRORAD_PATH)/Legacy.cpp \
                  $(PRORAD_PATH)/P3I.cpp    \
                  $(PRORAD_PATH)/FANET.cpp  \
                  $(PRORAD_PATH)/OGNTP.cpp  \
-                 $(PRORAD_PATH)/UAT978.cpp
+                 $(PRORAD_PATH)/UAT978.cpp  \
+                 $(PRORAD_PATH)/ADSL.cpp
 
 PRODAT_CPPS   := $(PRODAT_PATH)/NMEA.cpp    \
                  $(PRODAT_PATH)/GDL90.cpp   \
                  $(PRODAT_PATH)/D1090.cpp   \
-                 $(PRODAT_PATH)/JSON.cpp
+                 $(PRODAT_PATH)/JSON.cpp    \
+                 $(PRODAT_PATH)/IGC.cpp
 
 ifndef NOMAVLINK
 PRODAT_CPPS   += $(PRODAT_PATH)/MAVLink.cpp
@@ -119,7 +121,8 @@ PLAT_CPPS     := $(PLATFORM_PATH)/ESP8266.cpp  \
                  $(PLATFORM_PATH)/STM32.cpp    \
                  $(PLATFORM_PATH)/PSoC4.cpp    \
                  $(PLATFORM_PATH)/CC13XX.cpp   \
-                 $(PLATFORM_PATH)/nRF52.cpp
+                 $(PLATFORM_PATH)/nRF52.cpp  \
+                 $(PLATFORM_PATH)/RpiFileSys.cpp
 
 DRV_CPPS      := $(DRIVER_PATH)/RF.cpp        \
                  $(DRIVER_PATH)/GNSS.cpp      \
@@ -131,7 +134,9 @@ DRV_CPPS      := $(DRIVER_PATH)/RF.cpp        \
                  $(DRIVER_PATH)/Bluetooth.cpp \
                  $(DRIVER_PATH)/Sound.cpp     \
                  $(DRIVER_PATH)/WiFi.cpp      \
-                 $(DRIVER_PATH)/EPD.cpp
+                 $(DRIVER_PATH)/EPD.cpp      \
+                 $(DRIVER_PATH)/Settings.cpp \
+                 $(DRIVER_PATH)/Buzzer.cpp
 
 UI_CPPS       := $(UI_PATH)/Web.cpp        \
                  $(UI_PATH)/Radar_EPD.cpp  \
@@ -162,6 +167,8 @@ OBJS          := $(SRC_CPPS:.cpp=.o) \
                  $(RADIO_PATH)/lmic/radio.o $(RADIO_PATH)/lmic/oslmic.o \
                  $(RADIO_PATH)/lmic/lmic.o \
                  $(OGNLIB_PATH)/ldpc.o \
+                 $(OGNLIB_PATH)/ognconv.o \
+                 $(OGNLIB_PATH)/format.o \
                  $(GNSSLIB_PATH)/TinyGPS++.o \
                  $(TIMELIB_PATH)/Time.o \
                  $(NRF905_PATH)/nRF905.o \

@@ -495,6 +495,7 @@ bool latest_decode(void* buffer, container_t* this_aircraft, ufo_t* fop)
 #endif
 
     // do some sanity checks on the data
+    Serial.printf("V7 chk: lat_diff=%.3f lon_diff=%.3f course=%d\r\n", fabs(fop->latitude - this_aircraft->latitude), fabs(fop->longitude - this_aircraft->longitude), course);
     if (fabs(fop->latitude - this_aircraft->latitude) > 1.0
      || fabs(fop->longitude - this_aircraft->longitude) > InvCosLat()
      || course > 360 )

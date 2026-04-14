@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <stdarg.h>
 #include "raspi.h"
 
 //Initialize the values for sanity
@@ -376,6 +377,16 @@ size_t SerialSimulator::println(unsigned long n) {
   fprintf(stdout, "%lu\n", n);
 }
 
+size_t SerialSimulator::println(uint32_t n) {
+  fprintf(stdout, "%u\n", n);
+  return 0;
+}
+
+size_t SerialSimulator::println(bool b) {
+  fprintf(stdout, "%s\n", b ? "true" : "false");
+  return 0;
+}
+
 size_t SerialSimulator::print(unsigned int n, int base) {
   if (base == DEC)
     fprintf(stdout, "%d", n);
@@ -407,11 +418,19 @@ size_t SerialSimulator::println(unsigned char ch, int base) {
   fprintf( stdout, "\n");
 }
 
+size_t SerialSimulator::printf(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  int rc = vfprintf(stdout, fmt, args);
+  va_end(args);
+  return rc < 0 ? 0 : (size_t) rc;
+}
+
 size_t SerialSimulator::write(char ch) {
   fprintf( stdout, "%c", ch);
 }
 
-size_t SerialSimulator::write(unsigned char* s, size_t len) {
+size_t SerialSimulator::write(const unsigned char* s, size_t len) {
   for (int i=0; i<len; i++) {
     fprintf(stdout, "%c", s[i]);
   }

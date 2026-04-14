@@ -29,6 +29,7 @@
 #include "Settings.h"
 #include "Filesys.h"
 #include "../protocol/data/NMEA.h"
+#include "../protocol/data/NMEA.h"
 #include "../system/Time.h"
 #include "WiFi.h"
 #include "RF.h"
@@ -1435,7 +1436,7 @@ const gnss_chip_ops_t at65_ops = {
 #endif /* EXCLUDE_GNSS_AT65 */
 
 static bool GNSS_fix_cache = false;
-static bool badGGA = true;
+bool badGGA = true;
 
 int8_t leap_seconds_correction = 0;
 
@@ -1533,7 +1534,7 @@ static gnss_id_t probe_baud_rates()
     gnss_id_t rval = GNSS_MODULE_NONE;
     for (int i=BAUD_115200; i>=BAUD_9600; i--) {
         unsigned long baudrate = baudrates[i];
-#if defined(ARDUINO_ARCH_NRF52)
+#if defined(ARDUINO_ARCH_NRF52) || defined(RASPBERRY_PI)
         Serial_GNSS_In.flush();
         Serial_GNSS_In.end();
         SoC->swSer_begin(baudrate);   // because updateBaudRate() not supported

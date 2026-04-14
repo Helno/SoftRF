@@ -1,6 +1,8 @@
 #include <cstddef>
 #include <cstdlib>
+#if !defined(RASPBERRY_PI)
 #include <Arduino.h>
+#endif
 #include "lib_crc.h"
 
 #if defined(ESP8266) || defined(ESP32) || defined(__ASR6501__) || \

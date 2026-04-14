@@ -212,6 +212,10 @@ class SerialSimulator {
     static size_t print(unsigned long n);
     static size_t println(unsigned long n);
     static size_t print(unsigned int n, int base = DEC);
+    static size_t println(unsigned int n);
+    static size_t println(bool b);
+    static size_t printf(const char* fmt, ...);
+    static size_t write(const uint8_t* buf, size_t size);
     static size_t print(char ch);
     static size_t println(char ch);
     static size_t println(int8_t n);

@@ -31,6 +31,11 @@
 // in, case we have no DIO mapping to a GPIO pin, we'll need to read 
 // Lora Module IRQ register
 static bool check_dio = 0;
+uint32_t radio_irq_hit_count = 0;
+uint32_t rx_payloadready_count = 0;
+uint32_t rx_syncmatch_count = 0;
+uint32_t rx_packetsent_count = 0;
+uint32_t rx_lora_mode_count = 0;
 
 static void hal_interrupt_init(); // Fwd declaration
 
@@ -143,6 +148,7 @@ static void hal_io_check() {
     } else {
         // Check IRQ flags in radio module
         if ( radio_has_irq() ) {
+            radio_irq_hit_count++;
             radio_irq_handler(0);
         }
     }

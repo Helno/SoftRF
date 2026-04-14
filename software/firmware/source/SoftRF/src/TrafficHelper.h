@@ -118,7 +118,9 @@ extern uint8_t adsb_acfts;
 extern int8_t maxrssi;
 
 //#if defined(ESP32)
+#if defined(FILESYS)
 extern File AlarmLog;
+#endif
 extern bool AlarmLogOpen;
 void startlogs(void);
 void stoplogs(void);

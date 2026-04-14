@@ -59,9 +59,10 @@ byte getVal(char c)
      return (byte)(toupper(c)-'A'+10);
 }
 
+
 void JSON_Export()
 {
-  if (settings->json != JSON_PING) {
+  if (eeprom_block.field.settings.json != JSON_PING) {
     return;
   }
 
@@ -120,7 +121,7 @@ void JSON_Export()
   }
 
   if (has_aircraft) {
-    root.printTo(buffer);
+    serializeJson(root, buffer);
     Serial.println(buffer);
   }
 
@@ -214,16 +215,16 @@ void parsePING(JsonObject root)
         fo.vs = (float) aircraft_array[i].verVelocityCMS * (_GPS_FEET_PER_METER * 60.0) / 100;
         fo.stealth = false;
         fo.no_track = false;
-        fo.rssi = 0;
+        /* rssi not in ufo_t */
 
-        Traffic_Update(&fo);
+        Traffic_Update((container_t*)&fo);
 
         int j;
 
         /* Try to find and update an entry with the same aircraft ID */
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (Container[j].addr == fo.addr && Container[j].protocol == fo.protocol) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -236,7 +237,7 @@ void parsePING(JsonObject root)
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (Container[j].addr == 0) {
               // && memcmp(Container[j].raw, EmptyFO.raw, sizeof(EmptyFO.raw)) == 0) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -248,7 +249,7 @@ void parsePING(JsonObject root)
         /* Overwrite expired entry */
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (timestamp - Container[j].timestamp > ENTRY_EXPIRATION_TIME) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -356,7 +357,7 @@ void parseD1090(JsonObject root)
     }
 
     for (int i=0; i < size; i++) {
-      JsonObject& aircraft_obj = aircraft[i];
+      JsonObject aircraft_obj = aircraft[i];
 
       aircraft_array[i].hex = aircraft_obj["hex"];
       aircraft_array[i].squawk = aircraft_obj["squawk"];
@@ -412,16 +413,16 @@ void parseD1090(JsonObject root)
         fo.vs = aircraft_array[i].vert_rate;
         fo.stealth = false;
         fo.no_track = false;
-        fo.rssi = aircraft_array[i].rssi;
+        /* rssi not in ufo_t */
 
-        Traffic_Update(&fo);
+        Traffic_Update((container_t*)&fo);
 
         int j;
 
         /* Try to find and update an entry with the same aircraft ID */
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (Container[j].addr == fo.addr && Container[j].protocol == fo.protocol) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -434,7 +435,7 @@ void parseD1090(JsonObject root)
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (Container[j].addr == 0) {
               // && memcmp(Container[j].raw, EmptyFO.raw, sizeof(EmptyFO.raw)) == 0) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -446,7 +447,7 @@ void parseD1090(JsonObject root)
         /* Overwrite expired entry */
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (timestamp - Container[j].timestamp > ENTRY_EXPIRATION_TIME) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -516,7 +517,7 @@ void parseRAW(JsonObject root)
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (Container[j].addr == 0) {
                // && memcmp(Container[j].raw, EmptyFO.raw, sizeof(EmptyFO.raw)) == 0) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -528,7 +529,7 @@ void parseRAW(JsonObject root)
         /* Overwrite expired entry */
         for (j=0; j < MAX_TRACKING_OBJECTS; j++) {
           if (timestamp - Container[j].timestamp > ENTRY_EXPIRATION_TIME) {
-            Container[j] = fo;
+            *(ufo_t*)&Container[j] = fo; /* field-compat copy */;
             break;
           }
         }
@@ -635,15 +636,15 @@ void parseUISettings(JsonObject root)
     JsonVariant vmode = root[key];
     const char * vmode_s = vmode.as<char*>();
     if (!strcmp(vmode_s,"STATUS")) {
-      ui_settings.vmode = VIEW_MODE_STATUS;
+      ui_settings.viewmode = VIEW_MODE_STATUS;
     } else if (!strcmp(vmode_s,"RADAR")) {
-      ui_settings.vmode = VIEW_MODE_RADAR;
+      ui_settings.viewmode = VIEW_MODE_RADAR;
     } else if (!strcmp(vmode_s,"TEXT")) {
-      ui_settings.vmode = VIEW_MODE_TEXT;
+      ui_settings.viewmode = VIEW_MODE_TEXT;
     } else if (!strcmp(vmode_s,"BARO")) {
-      ui_settings.vmode = VIEW_MODE_BARO;
+      ui_settings.viewmode = VIEW_MODE_BARO;
     } else if (!strcmp(vmode_s,"TIME")) {
-      ui_settings.vmode = VIEW_MODE_TIME;
+      ui_settings.viewmode = VIEW_MODE_TIME;
     }
   }
 
@@ -652,13 +653,13 @@ void parseUISettings(JsonObject root)
     JsonVariant aghost = root[key];
     const char * aghost_s = aghost.as<char*>();
     if (!strcmp(aghost_s,"OFF")) {
-      ui_settings.aghost = ANTI_GHOSTING_OFF;
+      ui_settings.antighost = ANTI_GHOSTING_OFF;
     } else if (!strcmp(aghost_s,"2MIN")) {
-      ui_settings.aghost = ANTI_GHOSTING_2MIN;
+      ui_settings.antighost = ANTI_GHOSTING_2MIN;
     } else if (!strcmp(aghost_s,"5MIN")) {
-      ui_settings.aghost = ANTI_GHOSTING_5MIN;
+      ui_settings.antighost = ANTI_GHOSTING_5MIN;
     } else if (!strcmp(aghost_s,"10MIN")) {
-      ui_settings.aghost = ANTI_GHOSTING_10MIN;
+      ui_settings.antighost = ANTI_GHOSTING_10MIN;
     }
   }
 
@@ -753,23 +754,23 @@ void parseSettings(JsonObject root)
     JsonVariant aircraft_type = root[key];
     const char * aircraft_type_s = aircraft_type.as<char*>();
     if (!strcmp(aircraft_type_s,"GLIDER")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_GLIDER;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_GLIDER;
     } else if (!strcmp(aircraft_type_s,"TOWPLANE")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_TOWPLANE;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_TOWPLANE;
     } else if (!strcmp(aircraft_type_s,"POWERED")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_POWERED;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_POWERED;
     } else if (!strcmp(aircraft_type_s,"HELICOPTER")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_HELICOPTER;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_HELICOPTER;
     } else if (!strcmp(aircraft_type_s,"UAV")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_UAV;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_UAV;
     } else if (!strcmp(aircraft_type_s,"HANGGLIDER")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_HANGGLIDER;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_HANGGLIDER;
     } else if (!strcmp(aircraft_type_s,"PARAGLIDER")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_PARAGLIDER;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_PARAGLIDER;
     } else if (!strcmp(aircraft_type_s,"BALLOON")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_BALLOON;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_BALLOON;
     } else if (!strcmp(aircraft_type_s,"STATIC")) {
-      eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_STATIC;
+      eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_STATIC;
     }
   }
 

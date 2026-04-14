@@ -98,10 +98,12 @@ void startlogs()
     SD_log(NMEABuffer);
 #endif
     // and, if flight-logging, start now:
+#if defined(IGCFILESYS)
     if (settings->logflight == FLIGHT_LOG_AIRBORNE
      || settings->logflight == FLIGHT_LOG_TRAFFIC) {
         openFlightLog();
     }
+#endif
 }
 
 // close the alarm log and flight log after landing
@@ -111,10 +113,10 @@ void stoplogs()
     AlarmLog.close();
     AlarmLogOpen = false;
 #endif
-//#if defined(USE_SD_CARD)
+#if defined(IGCFILESYS)
     if (settings->logflight != FLIGHT_LOG_ALWAYS)
           closeFlightLog();
-//#endif
+#endif
 }
 
 unsigned long UpdateTrafficTimeMarker = 0;
@@ -801,7 +803,9 @@ void logOneTraffic(container_t *fop, const char *label)
       (int)(wind_speed * (1.0 / _GPS_MPS_PER_KNOT)), (int)wind_direction);
     //Serial.print(NMEABuffer);
     NMEAOutD();
+#if defined(IGCFILESYS)
     FlightLogComment(NMEABuffer+4);   // it will prepend the LPLT
+#endif
 //#endif
 }
 
@@ -816,8 +820,10 @@ void logrelayed(container_t *cip)
         NMEAOutD();
     else
         Serial.print(NMEABuffer);
+#if defined(IGCFILESYS)
     if (FlightLogOpen && settings->logflight == FLIGHT_LOG_TRAFFIC)
         FlightLogComment(NMEABuffer+4);   // it will prepend the LPLT
+#endif
 }
 
 // insert data about all "close" traffic into the flight log
@@ -996,13 +1002,12 @@ void Traffic_Update(container_t *fop)
           Alarm_timer = 0;
       }
 
-//#if defined(USE_SD_CARD)
-// - allow logalarms even on FATFS
+#if defined(IGCFILESYS)
       if (fop->alarm_level > old_alarm_level && FlightLogOpen) {
           if (settings->logalarms || settings->logflight == FLIGHT_LOG_TRAFFIC)
             logOneTraffic(fop, "LPLTA");  // do not wait until logFlightPosition()
       }
-//#endif
+#endif
   }
 
   // report received relayed - if first time or fresh
@@ -1047,6 +1052,27 @@ static void zero_range_stats()
         linrange,logrange,n  - for oclock=11
         rssi_mean,rssi_mean_square_deviation   - n=sum of range n's
 */
+void sample_range(container_t *fop)
+{
+    if (! ThisAircraft.airborne)       return;
+    if (! fop->airborne)               return;
+    if (fop->tx_type < TX_TYPE_FLARM)  return;
+    if (fop->distance < 1000.0)        return;
+    if (4.0 * fabs(fop->alt_diff) > fop->distance)    return;
+    int oclock = fop->RelativeHeading + 15;
+    if (oclock < 0)     oclock += 360;
+    if (oclock >= 360)  oclock -= 360;
+    oclock /= 30;
+    newrange[oclock] += log2(0.001f * fop->distance);
+    ++newrange_n[oclock];
+    float rssi = (float) fop->rssi;
+    newrssi_sum += rssi;
+    float rssi_dev = rssi - oldrssi_mean;
+    newrssi_dev += rssi_dev;
+    newrssi_ssd += rssi_dev * rssi_dev;
+    ++newrssi_n;
+}
+#if defined(FILESYS)
 // try and load range stats from file
 static bool load_range_stats()
 {
@@ -1107,26 +1133,6 @@ static bool load_range_stats()
     return true;
 }
 
-void sample_range(container_t *fop)
-{
-    if (! ThisAircraft.airborne)       return;
-    if (! fop->airborne)               return;
-    if (fop->tx_type < TX_TYPE_FLARM)  return;
-    if (fop->distance < 1000.0)        return;
-    if (4.0 * fabs(fop->alt_diff) > fop->distance)    return;
-    int oclock = fop->RelativeHeading + 15;
-    if (oclock < 0)     oclock += 360;
-    if (oclock >= 360)  oclock -= 360;
-    oclock /= 30;
-    newrange[oclock] += log2(0.001f * fop->distance);
-    ++newrange_n[oclock];
-    float rssi = (float) fop->rssi;
-    newrssi_sum += rssi;
-    float rssi_dev = rssi - oldrssi_mean;
-    newrssi_dev += rssi_dev;
-    newrssi_ssd += rssi_dev * rssi_dev;
-    ++newrssi_n;
-}
 
 // this is called after landing
 void save_range_stats()
@@ -1155,7 +1161,9 @@ void save_range_stats()
             newrange_n[oclock]);
         Serial.println(buf+3);
         statsfile.println(buf+3);   // skip the "AN,"
+#if defined(IGCFILESYS)
         FlightLogComment(buf);      // - it will prepend LPLT, resulting in, e.g., LPLTAN,...
+#endif
     }
     newrssi_sum += oldrssi_mean * (float) oldrssi_n;   // total new sum
     newrssi_n   += oldrssi_n;                // total count
@@ -1172,10 +1180,13 @@ void save_range_stats()
     snprintf(buf, 64, "AN,%f,%f", newrssi_sum, newrssi_ssd);
     Serial.println(buf+3);
     statsfile.println(buf+3);   // skip the "AN,"
+#if defined(IGCFILESYS)
     FlightLogComment(buf);      // - it will prepend LPLT, resulting in, e.g., LPLTAN,...
+#endif
     statsfile.close();
     load_range_stats();         // in case of another flight
 }
+#endif  // FILESYS
 
 /* relay landed-out or ADS-B traffic if we are airborne */
 void air_relay(container_t *cip)
@@ -1328,7 +1339,9 @@ Serial.println("...relay_waiting");
               PSTR("$PSRLY,%02d:%02d,%06x,%s\r\n"),
               gnss.time.hour(), gnss.time.minute(), cip->addr, cip->callsign);
             NMEAOutC(NMEA_T);
+#if defined(IGCFILESYS)
             FlightLogComment(NMEABuffer+3);    // will appear as LPLTRLY
+#endif
         }
     }
 
@@ -1448,10 +1461,14 @@ void report_landed_out(ufo_t *fop)
        PSTR("$PSRLO,%02d:%02d,%06x,%.5f,%.5f\r\n"),
        gnss.time.hour(), gnss.time.minute(), fop->addr, fop->latitude, fop->longitude);
     NMEAOutC(NMEA_T);
+#if defined(IGCFILESYS)
     FlightLogComment(NMEABuffer+4);    // will appear as LPLTLO
+#endif
     // also output to alarmlog
+#if defined(FILESYS)
     if (AlarmLogOpen)
         AlarmLog.print((const char *) NMEABuffer);
+#endif
 }
 
 void AddTraffic(ufo_t *fop, const char *callsign)
@@ -1714,7 +1731,9 @@ void Traffic_setup()
     break;
   }
 
+#if defined(FILESYS)
   load_range_stats();
+#endif
 
 #if defined(USE_SD_CARD)
     if (settings->rx1090

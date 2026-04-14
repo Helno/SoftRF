@@ -56,11 +56,21 @@ extern bool TARGETfileOpen;
 
 #endif
 
+
+#if defined(RASPBERRY_PI)
+#include "../platform/RpiFileSys.h"
+#define FILESYS      RpiFSobj
+#define FS_is_mounted RpiFS_is_mounted
+#define IGCFILESYS   RpiFSobj
+#define IGCFS_is_mounted RpiFS_is_mounted
+#endif /* RASPBERRY_PI */
 void Filesys_setup();
 
+#if defined(FILESYS)
 bool getline(File &infile, char *buf, int limit);
 
 uint32_t FILESYS_free_kb();    // on SPIFFS (T-Beam) or FATFS (T-Echo)
 uint32_t IGCFS_free_kb();      // on SD (T-Beam) or FATFS (T-Echo)
+#endif // FILESYS
 
 #endif // FILESYS_H

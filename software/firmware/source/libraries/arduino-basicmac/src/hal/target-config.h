@@ -12,7 +12,7 @@
 // This is the SX1276/SX1277/SX1278/SX1279 radio, which is also used on
 // the HopeRF RFM95 boards.
 #if !defined(__ASR6501__)
-#define BRD_sx1276_radio 1
+//#define BRD_sx1276_radio 1
 #endif
 #define BRD_sx1262_radio 1
 

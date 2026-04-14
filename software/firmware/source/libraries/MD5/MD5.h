@@ -25,7 +25,9 @@
 #ifndef MD5_h
 #define MD5_h
 
+#if !defined(RASPBERRY_PI)
 #include "Arduino.h"
+#endif
 #include <string.h>
 
 //namespace MD5

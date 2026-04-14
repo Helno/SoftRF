@@ -46,6 +46,7 @@
 
 #include "../system/SoC.h"
 #include "../driver/Settings.h"
+#include "../driver/GNSS.h"
 #include <TinyGPS++.h>
 #if !defined(EXCLUDE_MAVLINK)
 #include <aircraft.h>
@@ -53,6 +54,7 @@
 #include "../driver/RF.h"
 #include "../driver/LED.h"
 #include "../driver/Sound.h"
+#include "../driver/Buzzer.h"
 #include "../driver/Baro.h"
 #include "../TrafficHelper.h"
 #include "../protocol/data/NMEA.h"
@@ -61,6 +63,9 @@
 #include "../protocol/data/JSON.h"
 #include "../driver/WiFi.h"
 #include "../driver/EPD.h"
+EEPROMClass EEPROM;
+ui_settings_t ui_settings;
+
 #include "../driver/Battery.h"
 #include "../driver/Bluetooth.h"
 #include "../system/Time.h"
@@ -74,18 +79,14 @@
 
 #include <ArduinoJson.h>
 
-// Dragino LoRa/GPS HAT or compatible SX1276 pin mapping
+// Waveshare SX1262 HF module pin mapping
 lmic_pinmap lmic_pins = {
     .nss = SOC_GPIO_PIN_SS,
     .txe = LMIC_UNUSED_PIN,
     .rxe = LMIC_UNUSED_PIN,
     .rst = SOC_GPIO_PIN_RST,
-#if !defined(USE_OGN_RF_DRIVER)
-    .dio = {LMIC_UNUSED_PIN, LMIC_UNUSED_PIN, LMIC_UNUSED_PIN},
-#else
-    .dio = {SOC_GPIO_PIN_DIO0, LMIC_UNUSED_PIN, LMIC_UNUSED_PIN},
-#endif
-    .busy = SOC_GPIO_PIN_DIO0,
+    .dio = {LMIC_UNUSED_PIN, SOC_GPIO_PIN_DIO1, LMIC_UNUSED_PIN},
+    .busy = SOC_GPIO_PIN_BUSY,
     .tcxo = LMIC_UNUSED_PIN,
 };
 
@@ -114,9 +115,14 @@ void onEvent (ev_t ev) {
 #endif
 }
 
-eeprom_t eeprom_block;
-settings_t *settings = &eeprom_block.field.settings;
+extern eeprom_t eeprom_block;
 container_t ThisAircraft;
+
+uint32_t radio_irq_hit_count = 0;
+uint32_t rx_payloadready_count = 0;
+uint32_t rx_syncmatch_count = 0;
+uint32_t rx_packetsent_count = 0;
+uint32_t rx_lora_mode_count = 0;
 
 #if !defined(EXCLUDE_MAVLINK)
 aircraft the_aircraft;
@@ -143,6 +149,10 @@ hardware_info_t hw_info = {
 
 #define isTimeToExport() (millis() - ExportTimeMarker > 1000)
 unsigned long ExportTimeMarker = 0;
+uint32_t GNSSTimeMarker  = 0;
+uint32_t SetupTimeMarker = 0;
+uint32_t LEDTimeMarker   = 0;
+uint32_t IGCTimeMarker   = 0;
 
 std::string input_line;
 
@@ -154,28 +164,6 @@ GxEPD2_BW<GxEPD2_270, GxEPD2_270::HEIGHT> __attribute__ ((common)) epd_waveshare
 GxEPD2_BW<GxEPD2_270, GxEPD2_270::HEIGHT> *display;
 #endif /* USE_EPAPER */
 
-ui_settings_t ui_settings = {
-    .adapter      = 0,
-    .connection   = 0,
-    .units        = UNITS_METRIC,
-    .zoom         = ZOOM_MEDIUM,
-    .protocol     = PROTOCOL_NMEA,
-    .baudrate     = 0,
-    .server       = { 0 },
-    .key          = { 0 },
-    .rotate       = ROTATE_0,
-    .orientation  = DIRECTION_TRACK_UP,
-    .adb          = DB_NONE,
-    .idpref       = ID_REG,
-    .vmode        = VIEW_MODE_STATUS,
-    .voice        = VOICE_OFF,
-    .aghost       = ANTI_GHOSTING_OFF,
-    .filter       = TRAFFIC_FILTER_OFF,
-    .power_save   = 0,
-    .team         = 0
-};
-
-ui_settings_t *ui;
 
 const char *Hardware_Rev[] = {
   [0] = "Unknown"
@@ -264,7 +252,7 @@ static void RPi_setup()
   eeprom_block.field.settings.mode          = SOFTRF_MODE_NORMAL;
   eeprom_block.field.settings.rf_protocol   = RF_PROTOCOL_OGNTP;
   eeprom_block.field.settings.band          = RF_BAND_EU;
-  eeprom_block.field.settings.aircraft_type = AIRCRAFT_TYPE_GLIDER;
+  eeprom_block.field.settings.acft_type = AIRCRAFT_TYPE_GLIDER;
   eeprom_block.field.settings.txpower       = RF_TX_POWER_FULL;
   eeprom_block.field.settings.volume        = BUZZER_VOLUME_FULL;
   eeprom_block.field.settings.pointer       = DIRECTION_NORTH_UP;
@@ -275,9 +263,9 @@ static void RPi_setup()
   eeprom_block.field.settings.nmea_p        = false;
   eeprom_block.field.settings.nmea_t        = true;
   eeprom_block.field.settings.nmea_s        = true;
-  eeprom_block.field.settings.nmea_out      = NMEA_UART;
-  eeprom_block.field.settings.gdl90         = GDL90_OFF;
-  eeprom_block.field.settings.d1090         = D1090_OFF;
+  eeprom_block.field.settings.nmea_out      = 0; /* NMEA_UART (TTY/serial) */
+  eeprom_block.field.settings.gdl90         = 0; /* GDL90_OFF */
+  eeprom_block.field.settings.d1090         = 0; /* D1090_OFF */
   eeprom_block.field.settings.json          = JSON_OFF;
   eeprom_block.field.settings.stealth       = false;
   eeprom_block.field.settings.no_track      = false;
@@ -288,7 +276,6 @@ static void RPi_setup()
   eeprom_block.field.settings.igc_key[2]    = 0;
   eeprom_block.field.settings.igc_key[3]    = 0;
 
-  ui = &ui_settings;
 
   RPi_SerialNumber();
 }
@@ -352,6 +339,19 @@ static void* RPi_getResetInfoPtr()
   return (void *) &reset_info;
 }
 
+static uint32_t RPi_getFreeHeap()
+{
+  FILE *f = fopen("/proc/meminfo", "r");
+  if (f == NULL) return 0;
+  unsigned long free_kb = 0;
+  char line[128];
+  while (fgets(line, sizeof(line), f)) {
+    if (sscanf(line, "MemAvailable: %lu kB", &free_kb) == 1) break;
+  }
+  fclose(f);
+  return (uint32_t)(free_kb * 1024);
+}
+
 static long RPi_random(long howsmall, long howBig)
 {
   return howsmall + random() % (howBig - howsmall);
@@ -369,7 +369,7 @@ static void RPi_SPI_begin()
 
 static void RPi_swSer_begin(unsigned long baud)
 {
-  swSer.begin(baud);
+  Serial1.begin(baud);
 }
 
 pthread_t RPi_EPD_update_thread;
@@ -522,6 +522,8 @@ static void RPi_Button_fini()
   /* TODO */
 }
 
+static bool RPi_EEPROM_begin(size_t size) { return false; }
+
 const SoC_ops_t RPi_ops = {
   SOC_RPi,
   "RPi",
@@ -534,7 +536,7 @@ const SoC_ops_t RPi_ops = {
   RPi_getResetInfoPtr,
   NULL,
   NULL,
-  NULL,
+  RPi_getFreeHeap,
   RPi_random,
   NULL,
   NULL,
@@ -544,7 +546,7 @@ const SoC_ops_t RPi_ops = {
   NULL,
   NULL,
   NULL,
-  NULL,
+  RPi_EEPROM_begin,
   NULL,
   RPi_SPI_begin,
   RPi_swSer_begin,
@@ -588,8 +590,9 @@ static void parseNMEA(const char *str, int len)
   for (int i=0; i < len; i++) {
     gnss.encode(str[i]);
   }
+  gnss.encode('\n');  // std::getline strips newline; TinyGPS++ needs it to finalize checksum
   if (settings->nmea_g) {
-    NMEA_Out(settings->nmea_out, (byte *) str, len, true);
+    NMEA_Out(settings->nmea_out, (const char *) str, len, true);
   }
 
   GNSSTimeSync();
@@ -625,6 +628,33 @@ static void RPi_PickGNSSFix()
       // NMEA input
       parseNMEA(str, len);
 
+      uint32_t now_ms = millis();
+      bool is_gga = (len > 5 && strncmp(str+3, "GGA", 3) == 0);
+      bool is_rmc = (len > 5 && strncmp(str+3, "RMC", 3) == 0);
+
+      static uint32_t rpi_gga_ms = 0;
+      static uint32_t rpi_rmc_ms = 0;
+
+      if (is_gga) {
+        if (len > 40) { badGGA = false; rpi_gga_ms = now_ms; }
+        else           { badGGA = true;  rpi_gga_ms = 0; }
+      }
+      if (is_rmc) rpi_rmc_ms = now_ms;
+
+      // Signal new fix to Time_loop() when both GGA and RMC received within 600ms
+      if (rpi_gga_ms && rpi_rmc_ms) {
+        uint32_t diff = (rpi_gga_ms > rpi_rmc_ms)
+                        ? (rpi_gga_ms - rpi_rmc_ms)
+                        : (rpi_rmc_ms - rpi_gga_ms);
+        if (diff < 600) {
+          uint32_t commit_ms = (rpi_gga_ms > rpi_rmc_ms) ? rpi_gga_ms : rpi_rmc_ms;
+          latest_Commit_Time = commit_ms - gnss.time.age();
+          gnss_new_fix  = true;
+          gnss_new_time = true;
+          rpi_gga_ms = rpi_rmc_ms = 0;
+        }
+      }
+
     } else if (str[0] == '{') {
       // JSON input
 
@@ -633,7 +663,7 @@ static void RPi_PickGNSSFix()
 
       JsonVariant msg_class = root["class"];
 
-      if (msg_class.success()) {
+      if (msg_class) {
         const char *msg_class_s = msg_class.as<char*>();
 
         if (!strcmp(msg_class_s,"TPV")) { // "TPV"
@@ -682,7 +712,7 @@ static void RPi_ReadTraffic()
 
       JsonVariant msg_class = root["class"];
 
-      if (msg_class.success()) {
+      if (msg_class) {
         const char *msg_class_s = msg_class.as<char*>();
 
         if (!strcmp(msg_class_s,"SOFTRF")) {
@@ -708,7 +738,7 @@ static void RPi_ReadTraffic()
       }
 
       JsonVariant rawdata = root["rawdata"];
-      if (rawdata.success()) {
+      if (rawdata) {
         parseRAW(root);
       }
 
@@ -728,33 +758,34 @@ static void RPi_ReadTraffic()
 
 void normal_loop()
 {
-    /* Read GNSS data from standard input */
     RPi_PickGNSSFix();
+    GNSS_loop();
+    Time_loop();
+    static uint32_t last_time_print = 0;
+    extern uint32_t ref_time_ms;
+    extern uint32_t rx_packets_counter;
+    extern uint32_t radio_irq_hit_count;
+    extern uint32_t rx_payloadready_count;
+    extern uint32_t rx_syncmatch_count;
+    extern uint32_t rx_packetsent_count;
+    extern uint32_t rx_lora_mode_count;
 
-    /* Read NMEA data from GNSS module on GPIO pins */
-//    PickGNSSFix();
-
-    RPi_ReadTraffic();
-
-    RF_loop();
-
-    ThisAircraft.timestamp = now();
-
-    if (isValidFix()) {
-      RF_Transmit(RF_Encode(&ThisAircraft), true);
+    if (millis() - last_time_print > 5000) {
+        last_time_print = millis();
     }
-
+    RPi_ReadTraffic();
+    RF_loop();
+    ThisAircraft.timestamp = now();
+    if (isValidFix()) {
+      RF_Transmit(RF_Encode(&ThisAircraft, false), true);
+    }
     bool success = RF_Receive();
-
     if (success && isValidFix()) ParseData();
-
     if (isValidFix()) {
       Traffic_loop();
     }
-
     if (isTimeToExport()) {
       NMEA_Export();
-
       if (isValidFix()) {
         GDL90_Export();
         D1090_Export();
@@ -762,12 +793,8 @@ void normal_loop()
       }
       ExportTimeMarker = millis();
     }
-
-    // Handle Air Connect
     NMEA_loop();
-
     SoC->Display_loop();
-
     ClearExpired();
 }
 
@@ -783,6 +810,7 @@ void relay_loop()
 
     RF_loop();
 
+#if 0  /* container relay disabled: container_t has no .raw, fo/container type mismatch */
     for (int i=0; i < MAX_TRACKING_OBJECTS; i++) {
       size_t size = RF_Payload_Size(settings->rf_protocol);
       size = size > sizeof(Container[i].raw) ? sizeof(Container[i].raw) : size;
@@ -814,7 +842,7 @@ void relay_loop()
         fo.timestamp = now(); /* GNSS date&time */
 
         /* Follow duty cycle rule */
-        if (RF_Transmit(RF_Encode(&fo), true /* false */)) {
+        if (RF_Transmit(RF_Encode(&fo, false), true)) {
 #if 0
           printf("%06X %f %f %f %d %d %d\n",
               fo.addr,
@@ -830,6 +858,7 @@ void relay_loop()
         }
       }
     }
+#endif  /* container relay disabled */
 }
 
 unsigned int pos_ndx = 0;
@@ -870,7 +899,7 @@ void txrx_test_loop()
   tx_start_ms = millis();
 #endif
 
-  RF_Transmit(RF_Encode(&ThisAircraft), true);
+  RF_Transmit(RF_Encode(&ThisAircraft, false), true);
 
 #if DEBUG_TIMING
   tx_end_ms = millis();
@@ -944,6 +973,7 @@ void * traffic_tcpserv_loop(void * m)
 {
   pthread_detach(pthread_self());
   Traffic_TCP_Server.receive();
+  return NULL;
 }
 
 int main()
@@ -955,6 +985,7 @@ int main()
   }
 
   Serial.begin(SERIAL_OUT_BR);
+  setvbuf(stdout, NULL, _IOLBF, 0);  /* line-buffer stdout for pipe-safe NMEA output */
 
   hw_info.soc = SoC_setup(); // Has to be very first procedure in the execution order
 
@@ -966,7 +997,14 @@ int main()
   Serial.println(F("Copyright (C) 2015-2021 Linar Yusupov. All rights reserved."));
   Serial.flush();
 
+  fprintf(stderr, "DBG: Settings_setup start\n"); fflush(stderr);
+  Settings_setup();
+  fprintf(stderr, "DBG: Settings_setup done\n"); fflush(stderr);
+  fprintf(stderr, "DBG: nmea_out=%d nmea_out2=%d gdl90=%d d1090=%d\n", settings->nmea_out, settings->nmea_out2, settings->gdl90, settings->d1090); fflush(stderr);
+
+  fprintf(stderr, "DBG: RF_setup start\n"); fflush(stderr);
   hw_info.rf = RF_setup();
+  fprintf(stderr, "DBG: RF_setup done\n"); fflush(stderr);
 
   if (hw_info.rf == RF_IC_NONE) {
       exit(EXIT_FAILURE);

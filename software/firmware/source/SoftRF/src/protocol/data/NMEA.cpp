@@ -22,6 +22,10 @@
 #include <TimeLib.h>
 
 #include "NMEA.h"
+
+#ifndef MAX_NMEA_OBJECTS
+#define MAX_NMEA_OBJECTS 6
+#endif
 #include "GDL90.h"
 #include "GNS5892.h"
 #include "../../driver/GNSS.h"
@@ -389,7 +393,11 @@ bool rx1090found = false;
 void sendPFLAJ()
 {
     snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("$PFLAJ,A,%d,%d,%d*"),
+#if defined(IGCFILESYS)
                  ThisAircraft.airborne, FlightLogOpen, rx1090found);
+#else
+                 ThisAircraft.airborne, 0, rx1090found);
+#endif
     NMEAOutC(NMEA_T_PROJ);
 }
 
@@ -630,18 +638,18 @@ if (NMEA_Source != DEST_NONE) {     // only external sources
         if (nl)
           SoC->UART_ops->write((const byte *) "\r\n", 2);
       } else {
-        Serial.write(buf, size);
+        Serial.write((const uint8_t*)buf, size);
         if (nl)
-          Serial.write((const byte *) "\r\n",2);
+          Serial.write((const uint8_t*)"\r\n",2);
       }
     }
     break;
   case DEST_UART2:
     {
       if (has_serial2) {
-        Serial2.write(buf, size);
+        Serial2.write((uint8_t*)buf, size);
         if (nl)
-          Serial2.write((const byte *) "\r\n",2);
+          Serial2.write((uint8_t*)"\r\n",2);
       }
     }
     break;
@@ -1821,8 +1829,13 @@ static void nmea_cfg_restart(bool save_settings)
   SoC->WDT_fini();
   if (SoC->Bluetooth_ops) { SoC->Bluetooth_ops->fini(); }
   delay(2000);
+#if defined(RASPBERRY_PI)
+  exit(0);
+#else
   reboot();
+#endif
 }
+
 
 bool isdecdigit(const char *p)
 {

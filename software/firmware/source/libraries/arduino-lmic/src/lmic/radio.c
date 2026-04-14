@@ -336,6 +336,8 @@ static void opmodeLora() {
     writeReg(RegOpMode, u);
 }
 
+static u1_t packetsent_seen = 0;
+
 static void opmodeFSK() {
     u1_t u = 0;
 #ifdef CFG_sx1276_radio
@@ -487,6 +489,7 @@ static void power_tcxo (void) {
 #define RF_FIFOTHRESH_TXSTARTCONDITION_FIFONOTEMPTY 0x80
 
 static void txfsk () {
+    packetsent_seen = 0; // clear for new TX cycle
     // select FSK modem (from sleep mode)
     writeReg(RegOpMode, 0x0 /* 0x10 */ ); // FSK, BT=0.5
     ASSERT(readReg(RegOpMode) == 0x0 /* 0x10 */ );
@@ -778,6 +781,7 @@ static void rxfsk (u1_t rxmode) {
 
     // configure frequency
     configChannel();
+    { u4_t frf=((u4_t)readReg(RegFrfMsb)<<16)|((u4_t)readReg(RegFrfMid)<<8)|readReg(RegFrfLsb); printf("RX setup: freq=%u kHz LMIC=%u kHz\n", (unsigned int)(((unsigned long long)frf*32000)>>19), (unsigned int)(LMIC.freq/1000)); }
 
     // set LNA gain
     //writeReg(RegLna, LNA_RX_GAIN);
@@ -1047,13 +1051,16 @@ static CONST_TABLE(u2_t, LORA_RXDONE_FIXUP)[] = {
 // and thus avoid any IRQ line used to controler
 u1_t radio_has_irq (void) {
     u1_t flags ;
+    extern uint32_t rx_lora_mode_count;
     if( (readReg(RegOpMode) & OPMODE_LORA) != 0) { // LORA modem
+        rx_lora_mode_count++;
         flags = readReg(LORARegIrqFlags);
         if( flags & ( IRQ_LORA_TXDONE_MASK | IRQ_LORA_RXDONE_MASK | IRQ_LORA_RXTOUT_MASK ) ) 
             return 1;
     } else { // FSK modem
         flags = readReg(FSKRegIrqFlags2);
-        if ( flags & ( IRQ_FSK2_PACKETSENT_MASK | IRQ_FSK2_PAYLOADREADY_MASK) ) 
+        if ( (!packetsent_seen && (flags & IRQ_FSK2_PACKETSENT_MASK)) ||
+             (flags & IRQ_FSK2_PAYLOADREADY_MASK) ) 
             return 1;
         flags = readReg(FSKRegIrqFlags1);
         if ( flags & ( IRQ_FSK1_TIMEOUT_MASK | IRQ_FSK1_SYNCADDRESSMATCH_MASK ) )
@@ -1141,9 +1148,11 @@ void radio_irq_handler (u1_t dio) {
         u1_t flags1 = readReg(FSKRegIrqFlags1);
         u1_t flags2 = readReg(FSKRegIrqFlags2);
         if( flags2 & IRQ_FSK2_PACKETSENT_MASK ) {
-            // save exact tx time
+            extern uint32_t rx_packetsent_count; rx_packetsent_count++;
+            packetsent_seen = 1; // prevent re-triggering in polling mode
             LMIC.txend = now;
         } else if( flags2 & IRQ_FSK2_PAYLOADREADY_MASK ) {
+            extern uint32_t rx_payloadready_count; rx_payloadready_count++;
             // save exact rx time
             LMIC.rxtime = now;
             // read the PDU and inform the MAC that we received something
@@ -1167,9 +1176,8 @@ void radio_irq_handler (u1_t dio) {
             // indicate timeout
             LMIC.dataLen = 0;
         } else if( flags1 & IRQ_FSK1_SYNCADDRESSMATCH_MASK ) {
-            // read rx quality parameters
-            LMIC.snr  = 0; // determine snr
-            // RSSI [dBm]
+            extern uint32_t rx_syncmatch_count; rx_syncmatch_count++;
+            LMIC.snr  = 0;
             LMIC.rssi = - readReg(FSKRegRssiValue) / 2;
             return;
         } else {

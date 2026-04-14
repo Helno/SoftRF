@@ -83,6 +83,7 @@ extern bool gnss_needs_reset;
 extern bool gnss_new_fix;
 extern bool gnss_new_time;
 extern bool gnss_time_from_rmc;
+extern bool badGGA;
 extern uint32_t latest_Commit_Time;
 extern uint32_t GNSSTimeSyncMarker;
 

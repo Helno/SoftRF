@@ -19,11 +19,31 @@
  */
 
 // include this first, to get USE_SD_CARD
+#if defined(RASPBERRY_PI)
+/* IGC flight logging not supported on RPi build - provide stubs only */
+#include "../../driver/Settings.h"
+#include "IGC.h"
+bool FlightLogOpen = false;
+char FlightLogPath[80] = {0};
+char *PSRAMbuf = NULL;
+char *PSRAMbuf2 = NULL;
+size_t PSRAMbufSize = 0, PSRAMbufSize2 = 0, PSRAMbufUsed = 0, PSRAMbufUsed2 = 0;
+void FlightLogComment(const char *) {}
+void openFlightLog() {}
+void closeFlightLog() {}
+void completeFlightLog() {}
+void resumeFlightLog() {}
+const char *FlightLogStatus() { return ""; }
+void IGC_setup() {}
+void IGC_loop() {}
+#else /* !RASPBERRY_PI */
 #include "../../system/SoC.h"
 
 #if defined(ESP32)
 #if defined(USE_SD_CARD)
+#if !defined(RASPBERRY_PI)
 #include <SD.h>
+#endif
 #endif
 #endif
 
@@ -1358,3 +1378,5 @@ void MD5_test()
     test_final(md5_d);
 }
 
+
+#endif /* !RASPBERRY_PI */

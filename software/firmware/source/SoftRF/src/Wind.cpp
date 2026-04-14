@@ -19,16 +19,20 @@
 #include <math.h>
 
 #include "system/SoC.h"
+#include "driver/Filesys.h"
 #include "TrafficHelper.h"
 #include "Wind.h"
 #include "driver/Settings.h"
 #include "driver/GNSS.h"
 #include "driver/RF.h"
-#include "driver/Filesys.h"
 #include "protocol/radio/Legacy.h"
 #include "protocol/data/NMEA.h"
 #include "protocol/data/IGC.h"
 #include "protocol/data/GNS5892.h"
+
+#if defined(FILESYS)
+extern File AlarmLog;
+#endif
 
 float wind_best_ns = 0.0;  /* mps */
 float wind_best_ew = 0.0;
@@ -172,7 +176,9 @@ NMEAOutD();
 #if defined(ESP32)
 #if defined(USE_SD_CARD)
 if (SD_is_mounted)
+#if defined(IGCFILESYS)
 FlightLogComment(NMEABuffer);
+#endif
 #endif
 #endif
 }
@@ -195,7 +201,9 @@ snprintf_P(NMEABuffer, sizeof(NMEABuffer)," turning the other way tr=%.1f\r\n", 
 #if defined(ESP32)
 #if defined(USE_SD_CARD)
 if (SD_is_mounted)
+#if defined(IGCFILESYS)
 FlightLogComment(NMEABuffer);
+#endif
 }
 #endif
 #endif
@@ -228,7 +236,9 @@ NMEAOutD();
 #if defined(ESP32)
 #if defined(USE_SD_CARD)
 if (SD_is_mounted)
+#if defined(IGCFILESYS)
 FlightLogComment(NMEABuffer);
+#endif
 #endif
 #endif
 }
@@ -443,7 +453,9 @@ FlightLogComment(NMEABuffer);
 #if defined(ESP32)
 #if defined(USE_SD_CARD)
       if (SD_is_mounted)
+#if defined(IGCFILESYS)
         FlightLogComment(NMEABuffer);
+#endif
 #endif
 #endif
     }
@@ -460,7 +472,9 @@ FlightLogComment(NMEABuffer);
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("WNS,%.0f,%.1f,%.3f,%.1f,%.1f,%.1f\r\n"),
           ThisAircraft.course, drift_ns, weight_ns, wind_ns, wind_best_ns, wind_best_ew);
+#if defined(IGCFILESYS)
         FlightLogComment(NMEABuffer);
+#endif
       }
 #endif
 #endif
@@ -478,7 +492,9 @@ FlightLogComment(NMEABuffer);
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("WEW,%.0f,%.1f,%.3f,%.1f,%.1f,%.1f\r\n"),
           ThisAircraft.course, drift_ew, weight_ew, wind_ew, wind_best_ns, wind_best_ew);
+#if defined(IGCFILESYS)
         FlightLogComment(NMEABuffer);
+#endif
       }
 #endif
 #endif
@@ -492,7 +508,9 @@ FlightLogComment(NMEABuffer);
         snprintf_P(NMEABuffer, sizeof(NMEABuffer),
           PSTR("WSD,%.1f,%.0f\r\n"),
           wind_speed * (1.0 / _GPS_MPS_PER_KNOT), wind_direction);
+#if defined(IGCFILESYS)
         FlightLogComment(NMEABuffer);
+#endif
       }
 #endif
 #endif
@@ -628,7 +646,9 @@ void this_airborne(bool validfix)
         //    airborne, speed, ThisAircraft.latitude, ThisAircraft.longitude, ThisAircraft.altitude);
         if (SD_is_mounted && (settings->debug_flags & DEBUG_DEEPER)) {
           snprintf_P(NMEABuffer, sizeof(NMEABuffer), PSTR("AA,%d,%.1f\r\n"), airborne, speed);
+#if defined(IGCFILESYS)
           FlightLogComment(NMEABuffer);
+#endif
         }
 #endif
 #endif
@@ -644,8 +664,10 @@ void this_airborne(bool validfix)
           ThisAircraft.latitude, ThisAircraft.longitude);
       Serial.print((const char *) NMEABuffer);
       // also output to alarmlog
+#if defined(FILESYS)
       if (AlarmLogOpen)
           AlarmLog.print((const char *) NMEABuffer);
+#endif
       if (airborne <= 0) {
           save_range_stats();
 #if defined(ESP32)
@@ -704,7 +726,9 @@ void report_this_projection(container_t *this_aircraft, int proj_type)
       //if ((this_aircraft->circling && (counter & 0x01) == 0) || (counter & 0x07) == 0) {
       if (SD_is_mounted && (counter & 0x01) == 0) {
           // about every 5 (or 20) seconds
+#if defined(IGCFILESYS)
           FlightLogComment(NMEABuffer+3);  // LPLTPTA,...
+#endif
       }
 #endif
 #endif
@@ -733,7 +757,9 @@ void report_that_projection(container_t *fop, int proj_type)
       ++counter;
       if (SD_is_mounted && (counter & 0x07) == (fop->addr & 0x07)) {
           // about every 20 seconds for each other aircraft
+#if defined(IGCFILESYS)
           FlightLogComment(NMEABuffer+3);  // LPLTPOA,...
+#endif
       }
 #endif
 #endif

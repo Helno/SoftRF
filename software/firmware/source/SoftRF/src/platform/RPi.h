@@ -79,15 +79,19 @@ struct rst_info {
 #define SOC_GPIO_PIN_MISO     RPI_V2_GPIO_P1_35
 #define SOC_GPIO_PIN_SCK      RPI_V2_GPIO_P1_40
 #define SOC_GPIO_PIN_SS       RPI_V2_GPIO_P1_36
-#define SOC_GPIO_PIN_RST      RPI_V2_GPIO_P1_37
-#define SOC_GPIO_PIN_DIO0     RPI_V2_GPIO_P1_33  // IRQ on GPIO13 so P1 connector pin #33
+#define SOC_GPIO_PIN_RST      RPI_V2_GPIO_P1_22
+#define SOC_GPIO_PIN_DIO0     SOC_UNUSED_PIN
+#define SOC_GPIO_PIN_DIO1     RPI_V2_GPIO_P1_16
+#define SOC_GPIO_PIN_BUSY     RPI_V2_GPIO_P1_18
 #else
 #define SOC_GPIO_PIN_MOSI     RPI_V2_GPIO_P1_19
 #define SOC_GPIO_PIN_MISO     RPI_V2_GPIO_P1_21
 #define SOC_GPIO_PIN_SCK      RPI_V2_GPIO_P1_23
-#define SOC_GPIO_PIN_SS       RPI_V2_GPIO_P1_22 // Slave Select on GPIO25 so P1 connector pin #22
-#define SOC_GPIO_PIN_RST      RPI_V2_GPIO_P1_11 // Reset on GPIO17 so P1 connector pin #11
-#define SOC_GPIO_PIN_DIO0     RPI_V2_GPIO_P1_07 // IRQ on GPIO4 so P1 connector pin #7
+#define SOC_GPIO_PIN_SS       RPI_V2_GPIO_P1_24
+#define SOC_GPIO_PIN_RST      RPI_V2_GPIO_P1_22
+#define SOC_GPIO_PIN_DIO0     SOC_UNUSED_PIN
+#define SOC_GPIO_PIN_DIO1     RPI_V2_GPIO_P1_16
+#define SOC_GPIO_PIN_BUSY     RPI_V2_GPIO_P1_18
 #endif
 
 #define SOC_GPIO_PIN_GNSS_PPS SOC_UNUSED_PIN // RPI_V2_GPIO_P1_12 /* rev. 1.4 */
@@ -110,7 +114,6 @@ extern const char *Hardware_Rev[];
 #define EXCLUDE_WIFI
 #define EXCLUDE_LED_RING
 #define EXCLUDE_SOUND
-#define EXCLUDE_EEPROM
 #define EXCLUDE_CC13XX
 #define EXCLUDE_LK8EX1
 
@@ -143,6 +146,14 @@ extern const char *Hardware_Rev[];
 #if defined(USE_EPAPER)
 typedef void* EPD_Task_t;
 #endif /* USE_EPAPER */
+
+#define MAX_NMEA_OBJECTS 6
+#define USE_NMEA_CFG
+#ifndef INPUT_PULLDOWN
+#define INPUT_PULLDOWN 0
+#endif
+
+#define EEPROM_commit()  ({}) /* no-op: RPi has no EEPROM hardware */
 
 #endif /* PLATFORM_RPI_H */
 
