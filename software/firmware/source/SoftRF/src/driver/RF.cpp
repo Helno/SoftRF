@@ -761,6 +761,8 @@ static void sx12xx_setup()
   sx12xx_resetup();
 }
 
+void RF_chip_reset(uint8_t protocol);
+
 static void sx12xx_setvars()
 {
   if (LMIC.protocol && LMIC.protocol->modulation_type == RF_MODULATION_TYPE_LORA) {
