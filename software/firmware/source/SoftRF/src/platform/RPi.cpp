@@ -118,12 +118,6 @@ void onEvent (ev_t ev) {
 extern eeprom_t eeprom_block;
 container_t ThisAircraft;
 
-uint32_t radio_irq_hit_count = 0;
-uint32_t rx_payloadready_count = 0;
-uint32_t rx_syncmatch_count = 0;
-uint32_t rx_packetsent_count = 0;
-uint32_t rx_lora_mode_count = 0;
-
 #if !defined(EXCLUDE_MAVLINK)
 aircraft the_aircraft;
 #endif /* EXCLUDE_MAVLINK */
