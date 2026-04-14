@@ -200,3 +200,12 @@ jobs:
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
 
+      - name: Upload Raspberry artifacts
+        if: contains(matrix.board, 'raspberry')
+        uses: actions/upload-artifact@v4
+        with:
+          name: raspberry-binaries
+          path: |
+            software/firmware/source/SoftRF/SoftRF
+            software/firmware/source/SoftRF/SoftRF-aux
+          if-no-files-found: error
