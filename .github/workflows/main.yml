@@ -4,10 +4,6 @@ name: build
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ master ]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -20,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        board: ['esp8266:esp8266:nodemcuv2:xtal=80,eesz=4M3M', 'esp32:esp32:esp32:PartitionScheme=min_spiffs,CPUFreq=80,FlashMode=dio,FlashFreq=80,FlashSize=4M,DebugLevel=none', 'STM32:stm32:Nucleo_64', 'STM32:stm32:GenF1', 'energia:cc13xx:LAUNCHXL_CC1310', 'raspberry', 'CubeCell:CubeCell:CubeCell-GPS', 'adafruit:nrf52:pca10056']
+        board: ['raspberry']
 
     env:
       ARDUINO_IDE_VERSION: 1.8.13
@@ -189,10 +185,6 @@ jobs:
             cd $GITHUB_WORKSPACE/software/firmware/source/SoftRF ;
             make pi;
           fi ;
-          if [[ "$BOARD" =~ "raspberry"           ]]; then
-            cd $GITHUB_WORKSPACE/software/firmware/source/SkyView ;
-            make -f Makefile.RPi ;
-          fi ;
           if [[ "$BOARD" =~ "CubeCell:CubeCell:" ]]; then
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
@@ -200,3 +192,11 @@ jobs:
             arduino --verify --verbose-build --board $BOARD $PWD/software/firmware/source/SoftRF/SoftRF.ino ;
           fi ;
 
+      - name: Upload Raspberry artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raspberry-binaries
+          path: |
+            software/firmware/source/SoftRF/SoftRF
+            software/firmware/source/SoftRF/SoftRF-aux
+          if-no-files-found: error
