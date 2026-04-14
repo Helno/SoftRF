@@ -116,6 +116,7 @@ extern const char *Hardware_Rev[];
 #define EXCLUDE_SOUND
 #define EXCLUDE_CC13XX
 #define EXCLUDE_LK8EX1
+#define EXCLUDE_SX1276
 
 #define USE_NMEALIB
 //#define USE_EPAPER

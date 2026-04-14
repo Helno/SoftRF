@@ -182,7 +182,7 @@ OBJS          := $(SRC_CPPS:.cpp=.o) \
                  $(TCPSRV_PATH)/TCPServer.o \
                  $(DUMP978_PATH)/fec.o $(DUMP978_PATH)/fec/init_rs_char.o \
                  $(DUMP978_PATH)/uat_decode.o $(DUMP978_PATH)/fec/decode_rs_char.o \
-                 $(GFX_PATH)/Adafruit_GFX.o $(LMIC_PATH)/raspi/Print.o \
+                 $(GFX_PATH)/Adafruit_GFX.o $(RADIO_PATH)/raspi/Print.o \
                  $(EPD2_PATH)/GxEPD2_EPD.o $(EPD2_PATH)/epd/GxEPD2_270.o \
                  $(U8G2_PATH)/U8g2_for_Adafruit_GFX.o $(U8G2_PATH)/u8g2_fonts.o
 
