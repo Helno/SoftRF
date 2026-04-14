@@ -762,6 +762,7 @@ static void sx12xx_setup()
   sx12xx_resetup();
 }
 
+void RF_chip_channel(uint8_t protocol);
 void RF_chip_reset(uint8_t protocol);
 
 static void sx12xx_setvars()
