@@ -1053,6 +1053,10 @@ int main()
       break;
     }
 
+    // Raspberry Pi runs this loop in userspace without an RTOS scheduler;
+    // yield briefly so normal polling does not pin a full CPU core.
+    delay(1);
+
 #if defined(TAKE_CARE_OF_MILLIS_ROLLOVER)
     /* take care of millis() rollover on a long term run */
     if (millis() > (47 * 24 * 3600 * 1000UL)) {
