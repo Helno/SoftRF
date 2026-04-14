@@ -796,7 +796,11 @@ static bool sx12xx_receive()
   bool success = false;
   sx12xx_receive_complete = false;
 
-  //LMIC.protocol = curr_rx_protocol_ptr;  done in set_protocol_for_slot
+  if (LMIC.protocol != curr_rx_protocol_ptr) {
+    RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
+    LMIC.protocol = curr_rx_protocol_ptr;
+    RF_chip_reset(current_RX_protocol);
+  }
 
   if (!sx12xx_receive_active) {  // reset by sx12xx_rx_func() or by sx12xx_channel()
     if (settings->power_save & POWER_SAVE_NORECEIVE) {
@@ -2648,12 +2652,12 @@ void set_protocol_for_slot()
   //if (current_RX_protocol != prev_protocol)
   //    RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
 
-  if (LMIC.protocol != curr_rx_protocol_ptr) {
-      RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
-      LMIC.protocol = curr_rx_protocol_ptr;    // tx will switch to curr_tx_protocol_ptr
-      RF_chip_reset(current_RX_protocol);
+  if (LMIC.protocol != curr_tx_protocol_ptr) {
+      RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
+      LMIC.protocol = curr_tx_protocol_ptr;
+      RF_chip_reset(current_TX_protocol);
   } else {
-      RF_chip_channel(current_RX_protocol);
+      RF_chip_channel(current_TX_protocol);
   }
 
 /*
