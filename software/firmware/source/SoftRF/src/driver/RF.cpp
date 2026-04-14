@@ -165,6 +165,7 @@ static bool sx12xx_receive(void);
 static void sx12xx_transmit(void);
 static void sx1276_shutdown(void);
 static void sx1262_shutdown(void);
+bool RF_Transmit_Happened(void);
 
 static bool uatm_probe(void);
 static void uatm_setup(void);
@@ -799,6 +800,14 @@ static bool sx12xx_receive()
   sx12xx_receive_complete = false;
 
   if (LMIC.protocol != curr_rx_protocol_ptr) {
+    if (rf_chip == &sx1262_ops
+     && curr_rx_protocol_ptr == &flr_adsl_proto_desc
+     && curr_tx_protocol_ptr != curr_rx_protocol_ptr
+     && TxEndMarker != 0
+     && !RF_Transmit_Happened()
+     && millis() < TxEndMarker) {
+      return false;
+    }
     RF_FreqPlan.setPlan(settings->band, current_RX_protocol);
     LMIC.protocol = curr_rx_protocol_ptr;
     RF_chip_reset(current_RX_protocol);
@@ -2922,6 +2931,8 @@ bool RF_Transmit(size_t size, bool wait)   // called with no-wait only for air-r
             RF_FreqPlan.setPlan(settings->band, current_TX_protocol);
             LMIC.protocol = curr_tx_protocol_ptr;
             RF_chip_reset(current_TX_protocol);
+            if (rf_chip == &sx1262_ops && curr_tx_protocol_ptr != curr_rx_protocol_ptr)
+                delay(10);
         }
 
         bool success = true;
