@@ -938,7 +938,7 @@ static void sx12xx_rx_func(osjob_t* job) {
       } else {
           RF_last_protocol = RF_PROTOCOL_NONE;
           sx12xx_receive_complete = false;
-//Serial.printf("Unidentified packet protocol 0x%02x 0x%02x\r\n", LMIC.frame[0], LMIC.frame[1]);
+Serial.printf("Unidentified packet protocol 0x%02x 0x%02x\r\n", LMIC.frame[0], LMIC.frame[1]);
           return;
       }
   }
@@ -946,9 +946,9 @@ static void sx12xx_rx_func(osjob_t* job) {
   if (size > sizeof(RxBuffer))
       size = sizeof(RxBuffer);
 
-//Serial.print("size=");
-//Serial.println(size);
-//Serial.println(Bin2Hex((byte *) LMIC.frame, size));
+Serial.print("size=");
+Serial.println(size);
+Serial.println(Bin2Hex((byte *) LMIC.frame, size));
 
   u1_t offset = LMIC.protocol->payload_offset;    // 0 for FLR & ADSL & OGNTP
 
