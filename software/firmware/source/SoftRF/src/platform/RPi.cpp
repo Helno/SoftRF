@@ -613,7 +613,7 @@ static void parseNMEA(const char *str, int len)
 
 static void RPi_PickGNSSFix()
 {
-  if (inputAvailable()) {
+  while (inputAvailable()) {
     std::getline(std::cin, input_line);
     const char *str = input_line.c_str();
     int len = input_line.length();
